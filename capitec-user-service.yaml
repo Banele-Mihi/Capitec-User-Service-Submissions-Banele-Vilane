@@ -1,129 +1,157 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banele-microservice
+---
+#Postgres-----Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: capitec-postgres
+  name: postgres
+  namespace: banele-microservice
   labels:
-    name: capitec-postgres
-    app: capitec-user-service
+    name: postgres
+    app: user-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      name: capitec-postgres-pod
-      app: capitec-user-service
+      name: postgres-pod
+      app: user-service
   template:
     metadata:
-      name: capitec-postgres-pod
+      name: postgres-pod
       labels:
-        name: capitec-postgres-pod
-        app: capitec-user-service
+        name: postgres-pod
+        app: user-service
     spec:
       containers:
-        - name: postgres
-          image: postgres:latest 
-          ports:
-            - containerPort: 5432
-          env:
-            - name: POSTGRES_USER
-              value: "postgres"
-            - name: POSTGRES_PASSWORD
-              value: "postgres"
+      - name: postgres
+        image: postgres:latest
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
 ---
+#Postgres-----Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: db
+  name: postgres
+  namespace: banele-microservice
   labels:
     name: postgres-service
-    app: capitec-user-service
+    app: user-service
 spec:
   selector:
-    name: capitec-postgres-pod
-    app: capitec-user-service
+    name: postgres-pod
+    app: user-service
   ports:
-    - port: 5432
-      targetPort: 5432
+  - port: 5432
+    targetPort: 5432
 ---
+#Back-end-----Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: capitec-frontend
+  name: backend
+  namespace: banele-microservice
   labels:
-    name: capitec-frontend
-    app: capitec-user-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      name: capitec-frontend-pod
-      app: capitec-user-service
-  template:
-    metadata:
-      name: capitec-frontend-pod
-      labels:
-        name: capitec-frontend-pod
-        app: capitec-user-service
-    spec:
-      containers:
-        - name: frontend
-          image: thapeloseema/capitec-user-service:frontend-windows-latest
-          ports:
-            - containerPort: 4200
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: capitec-frontend
-spec:
-  selector:
-    name: capitec-frontend
-    app: capitec-user-service
-  ports:
-    - port: 80
-      targetPort: 4200
-      nodePort: 30006
-  type: NodePort
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: capitec-backend
-  labels:
-    name: capitec-backend
-    app: apitec-user-service
+    name: backend
+    app: user-service
 spec:
   replicas: 4
   selector:
     matchLabels:
-      name: capitec-backend-pod
-      app: capitec-user-service
+      name: backend-pod
+      app: user-service
   template:
     metadata:
-        name: capitec-backend-pod
-        labels:
-          name: capitec-backend-pod
-          app: capitec-user-service
+      name: backend-pod
+      labels:
+        name: backend-pod
+        app: user-service
     spec:
       containers:
-        - name: capitec-backend-pod
-          image: thapeloseema/capitec-user-service:backend-windows-latest
-          ports:
-            - containerPort: 8080
-          
+      - name: backend
+        image: thapeloseema/capitec-user-service:backend-arm64
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/postgres"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "postgres"
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "postgres"
 ---
+#Back-end-----Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: capitec-backend
+  name: backend
+  namespace: banele-microservice
   labels:
-    name: capitec-backend
-    app: capitec-user-service
+    name: backend
+    app: user-service
+spec:
+  type: ClusterIP
+  selector:
+    name: backend-pod
+    app: user-service
+  ports:
+  - port: 8080
+    targetPort: 8080
+---
+#Front-end-----Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: banele-microservice
+  labels:
+    name: frontend
+    app: user-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      name: frontend-pod
+      app: user-service
+  template:
+    metadata:
+      name: frontend-pod
+      labels:
+        name: frontend-pod
+        app: user-service
+    spec:
+      containers:
+      - name: frontend
+        image: thapeloseema/capitec-user-service:frontend-arm64
+        ports:
+        - containerPort: 4200
+        env:
+        - name: BACKEND_URL
+          value: "http://backend:8080"
+---
+#Front-end-----Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: banele-microservice
+  labels:
+    name: frontend
+    app: user-service
 spec:
   type: NodePort
   selector:
-    name: capitec-backend-pod
-    app: capitec-user-service
+    name: frontend-pod
+    app: user-service
   ports:
-    - port: 8080
-      targetPort: 8080
-      nodePort: 30007
+  - port: 80
+    targetPort: 4200
+    nodePort: 30006
